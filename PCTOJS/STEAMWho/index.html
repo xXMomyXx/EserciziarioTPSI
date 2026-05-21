@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>STEAM Who? - versione semplice</title>
+    <style>
+        body { font-family: sans-serif; max-width: 600px; margin: 30px auto; padding: 0 15px; }
+        button { padding: 10px 20px; margin: 5px; font-size: 1rem; }
+        .question { font-size: 1.2rem; margin: 20px 0; }
+        .result { font-weight: bold; margin: 15px 0; }
+    </style>
+</head>
+<body>
+<h2>STEAM Who?</h2>
+<p>Pensa a uno di questi personaggi, poi rispondi alle domande:</p>
+<ul id="characterList"></ul>
+
+<div class="question" id="questionText"></div>
+<div>
+    <button id="yesBtn">Sì</button>
+    <button id="noBtn">No</button>
+</div>
+<div class="result" id="resultText"></div>
+<button id="restartBtn" style="display:none;">Ricomincia</button>
+
+<script>
+
+    // DATI DEI PERSONAGGI
+    const characters = [
+        { name: "Marie Curie",           uomo: false, scienziato: true,  artista: false, musicista: false, natoPre1800: false, vissutoPost1900: true  },
+        { name: "Antoine Lavoisier",     uomo: true,  scienziato: true,  artista: false, musicista: false, natoPre1800: true,  vissutoPost1900: false },
+        { name: "Louis Pasteur",         uomo: true,  scienziato: true,  artista: false, musicista: false, natoPre1800: false, vissutoPost1900: false },
+        { name: "Joseph Louis Proust",   uomo: true,  scienziato: true,  artista: false, musicista: false, natoPre1800: true,  vissutoPost1900: false },
+        { name: "Albert Einstein",       uomo: true,  scienziato: true,  artista: false, musicista: false, natoPre1800: false, vissutoPost1900: true  },
+        { name: "Nikola Tesla",          uomo: true,  scienziato: true,  artista: false, musicista: false, natoPre1800: false, vissutoPost1900: true  },
+        { name: "Isaac Newton",          uomo: true,  scienziato: true,  artista: false, musicista: false, natoPre1800: true,  vissutoPost1900: false },
+        { name: "Archimede",             uomo: true,  scienziato: true,  artista: false, musicista: false, natoPre1800: true,  vissutoPost1900: false },
+        { name: "John Von Neumann",      uomo: true,  scienziato: true,  artista: false, musicista: false, natoPre1800: false, vissutoPost1900: true  },
+        { name: "George Boole",          uomo: true,  scienziato: true,  artista: false, musicista: false, natoPre1800: false, vissutoPost1900: false },
+        { name: "Gustave Eiffel",        uomo: true,  scienziato: true,  artista: false, musicista: false, natoPre1800: false, vissutoPost1900: true  },
+        { name: "Blaise Pascal",         uomo: true,  scienziato: true,  artista: false, musicista: false, natoPre1800: true,  vissutoPost1900: false },
+        { name: "Galileo Galilei",       uomo: true,  scienziato: true,  artista: false, musicista: false, natoPre1800: true,  vissutoPost1900: false },
+        { name: "Michelangelo Buonarroti", uomo: true,  scienziato: false, artista: true,  musicista: false, natoPre1800: true,  vissutoPost1900: false },
+        { name: "Ludwig Van Beethoven",  uomo: true,  scienziato: false, artista: false, musicista: true,  natoPre1800: true,  vissutoPost1900: false }
+    ];
+
+    // DOMANDE
+    // Ogni domanda ha una funzione filtro: riceve il personaggio e la risposta "Sì" (true)
+    // e restituisce true se il personaggio DEVE RIMANERE tra i possibili.
+    const questions = [
+        { text: "Il tuo personaggio è uomo?",
+            filter: (ch, yes) => yes ? ch.uomo : !ch.uomo },
+        { text: "Il tuo personaggio è uno scienziato?",
+            filter: (ch, yes) => yes ? ch.scienziato : !ch.scienziato },
+        { text: "Il tuo personaggio è un artista?",
+            filter: (ch, yes) => yes ? ch.artista : !ch.artista },
+        { text: "Il tuo personaggio è un musicista?",
+            filter: (ch, yes) => yes ? ch.musicista : !ch.musicista },
+        { text: "Il tuo personaggio è nato prima del 1800?",
+            filter: (ch, yes) => yes ? ch.natoPre1800 : !ch.natoPre1800 },
+        { text: "Il tuo personaggio è vissuto dopo il 1900?",
+            filter: (ch, yes) => yes ? ch.vissutoPost1900 : !ch.vissutoPost1900 }
+    ];
+
+    // STATO DEL GIOCO
+    let remaining = [];            // array dei personaggi ancora possibili
+    let currentQuestionIdx = 0;   // quale domanda stiamo mostrando
+
+    // ELEMENTI HTML
+    const charListEl   = document.getElementById('characterList');
+    const questionEl   = document.getElementById('questionText');
+    const yesBtn       = document.getElementById('yesBtn');
+    const noBtn        = document.getElementById('noBtn');
+    const resultEl     = document.getElementById('resultText');
+    const restartBtn   = document.getElementById('restartBtn');
+
+    // FUNZIONI DEL GIOCO
+    /** Mostra l'elenco dei personaggi nella pagina (solo all'inizio) */
+    function renderCharacterList() {
+        charListEl.innerHTML = characters.map(c => `<li>${c.name}</li>`).join('');
+    }
+
+    /** Avvia una nuova partita */
+    function startGame() {
+        // Copiamo TUTTI i personaggi nell'array "remaining"
+        remaining = characters.map(c => ({...c})); // copia superficiale (basta per noi)
+        currentQuestionIdx = 0;
+
+        // Nascondi il risultato precedente e il pulsante restart
+        resultEl.textContent = '';
+        restartBtn.style.display = 'none';
+
+        // Abilita i pulsanti Sì/No
+        yesBtn.disabled = false;
+        noBtn.disabled = false;
+
+        // Mostra la prima domanda
+        showQuestion();
+    }
+
+    /** Mostra la domanda corrente */
+    function showQuestion() {
+        if (currentQuestionIdx < questions.length) {
+            questionEl.textContent = questions[currentQuestionIdx].text;
+        } else {
+            // Abbiamo finito le domande: proviamo ad indovinare
+            makeGuess();
+        }
+    }
+
+    /** L'utente ha cliccato Sì (true) o No (false) */
+    function handleAnswer(answerYes) {
+        if (remaining.length === 0) return; // già finito
+
+        // Prendi la domanda corrente e filtra i personaggi
+        const q = questions[currentQuestionIdx];
+        remaining = remaining.filter(ch => q.filter(ch, answerYes));
+
+        // Passa alla prossima domanda
+        currentQuestionIdx++;
+
+        // Controlla se abbiamo ancora personaggi
+        if (remaining.length === 0) {
+            // Nessun personaggio corrisponde -> errore
+            gameOver("Nessun personaggio corrisponde alle tue risposte.");
+        } else if (remaining.length === 1) {
+            // Un solo personaggio rimasto -> indovinato!
+            gameOver(`Il tuo personaggio è <strong>${remaining[0].name}</strong>!`);
+        } else {
+            // Più personaggi rimasti: prosegui con la prossima domanda
+            showQuestion();
+        }
+    }
+
+    /** Termina il gioco e mostra il messaggio */
+    function gameOver(message) {
+        questionEl.textContent = '';
+        resultEl.innerHTML = message;
+        yesBtn.disabled = true;
+        noBtn.disabled = true;
+        restartBtn.style.display = 'inline-block';
+    }
+
+    /** Se finite le domande e ci sono ancora più personaggi, prendi il primo (scelta di default) */
+    function makeGuess() {
+        if (remaining.length > 0) {
+            gameOver(`Il tuo personaggio è <strong>${remaining[0].name}</strong>!`);
+        } else {
+            gameOver("Nessun personaggio corrisponde.");
+        }
+    }
+
+    // COLLEGAMENTO EVENTI
+    yesBtn.addEventListener('click', () => handleAnswer(true));
+    noBtn.addEventListener('click', () => handleAnswer(false));
+    restartBtn.addEventListener('click', startGame);
+
+    // AVVIO AUTOMATICO
+    renderCharacterList();
+    startGame();
+</script>
+</body>
+</html>
